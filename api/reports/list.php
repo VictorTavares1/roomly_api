@@ -1,6 +1,4 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
 require '../../config/db.php';
 
 // Aqui fazemos a ligação (JOIN) usando os nomes corretos da tua tabela

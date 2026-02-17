@@ -1,8 +1,4 @@
 <?php
-// Devolve todas as reservas ativas para o calendário pintar
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-
 require '../../config/db.php';
 
 try {

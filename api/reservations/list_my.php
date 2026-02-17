@@ -1,7 +1,4 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-
 require '../../config/db.php';
 
 // Prevenção de erro: verifica se a variável se chama $conn ou $pdo no db.php

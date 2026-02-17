@@ -1,7 +1,4 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-
 require '../../config/db.php';
 
 $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');

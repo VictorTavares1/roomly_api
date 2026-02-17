@@ -1,11 +1,4 @@
 <?php
-// ==========================================
-// 📊 ESTATÍSTICAS DO DASHBOARD (Versão Final V5 - Lógica Híbrida)
-// ==========================================
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
-
 require '../../config/db.php';
 
 $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
