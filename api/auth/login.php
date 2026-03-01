@@ -1,4 +1,5 @@
 <?php
+require __DIR__ . '/../../config/cors.php';
 require __DIR__ . '/../../config/db.php';
 require __DIR__ . '/../../helpers/response.php';
 
