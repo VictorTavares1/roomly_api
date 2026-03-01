@@ -1,20 +1,30 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"));
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin', 'funcionario']);
 
-if (isset($data->id) && isset($data->status)) {
+$data = get_json_body();
+require_fields($data, ['id', 'status']);
+
+$id = validate_positive_int($data['id'], 'id');
+validate_whitelist($data['status'], ['aberto', 'em_progresso', 'resolvido'], 'status');
+
+try {
     $query = "UPDATE reports SET status = :status WHERE id = :id";
     $stmt = $conn->prepare($query);
-    $stmt->bindParam(":status", $data->status);
-    $stmt->bindParam(":id", $data->id);
+    $stmt->bindParam(":status", $data['status']);
+    $stmt->bindParam(":id", $id, PDO::PARAM_INT);
 
     if ($stmt->execute()) {
-        echo json_encode(["status" => "sucesso"]);
+        json_success("Estado do reporte atualizado!");
     } else {
-        echo json_encode(
-            ["status" => "erro"]
-        );
+        json_error("Erro ao atualizar estado.", 500);
     }
+
+} catch (PDOException $e) {
+    error_log("Erro ao atualizar reporte: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

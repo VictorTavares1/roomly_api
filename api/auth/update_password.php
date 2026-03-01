@@ -1,46 +1,53 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$json = file_get_contents("php://input");
-$data = json_decode($json);
+$auth_user = authenticate($conn);
+$data = get_json_body();
+require_fields($data, ['current_password', 'new_password']);
 
-if (isset($data->user_id) && isset($data->current_password) && isset($data->new_password)) {
+$user_id = $auth_user['id'];
+$current_password = $data['current_password'];
+$new_password = $data['new_password'];
 
-    $user_id = $data->user_id;
-    $current_password = $data->current_password;
-    $new_password = $data->new_password;
+// Validar tamanho mínimo da nova password
+if (strlen($new_password) < 6) {
+    json_error("A nova palavra-passe deve ter pelo menos 6 caracteres.", 400);
+}
 
-    try {
-        $query = "SELECT `password` FROM users WHERE id = :id LIMIT 1";
-        $stmt = $conn->prepare($query);
-        $stmt->bindParam(":id", $user_id);
-        $stmt->execute();
+try {
+    $query = "SELECT `password` FROM users WHERE id = :id LIMIT 1";
+    $stmt = $conn->prepare($query);
+    $stmt->bindParam(":id", $user_id);
+    $stmt->execute();
 
-        if ($stmt->rowCount() > 0) {
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // 1. Verifica a senha atual (ainda em modo híbrido para não dar erro agora)
-            if (password_verify($current_password, $user['password']) || $current_password === $user['password']) {
-
-                // 2. AQUI ESTÁ A MÁGICA: Encriptamos a NOVA senha antes de guardar
-                $nova_senha_encriptada = password_hash($new_password, PASSWORD_DEFAULT);
-
-                $query_update = "UPDATE users SET `password` = :new_pass WHERE id = :id";
-                $stmt_update = $conn->prepare($query_update);
-
-                // Guardamos o HASH e não o texto limpo
-                $stmt_update->bindParam(":new_pass", $nova_senha_encriptada);
-                $stmt_update->bindParam(":id", $user_id);
-
-                if ($stmt_update->execute()) {
-                    echo json_encode(["status" => "sucesso", "mensagem" => "Senha atualizada e encriptada!"]);
-                }
-            } else {
-                echo json_encode(["status" => "erro", "mensagem" => "Senha atual incorreta."]);
-            }
-        }
-    } catch (Exception $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro: " . $e->getMessage()]);
+    if (!$user) {
+        json_error("Utilizador não encontrado.", 404);
     }
+
+    // Verificar password atual (SEM fallback de texto claro)
+    if (!password_verify($current_password, $user['password'])) {
+        json_error("Senha atual incorreta.", 401);
+    }
+
+    // Encriptar nova password
+    $nova_senha_encriptada = password_hash($new_password, PASSWORD_DEFAULT);
+
+    $query_update = "UPDATE users SET `password` = :new_pass WHERE id = :id";
+    $stmt_update = $conn->prepare($query_update);
+    $stmt_update->bindParam(":new_pass", $nova_senha_encriptada);
+    $stmt_update->bindParam(":id", $user_id);
+
+    if ($stmt_update->execute()) {
+        json_success("Senha atualizada com sucesso!");
+    } else {
+        json_error("Erro ao atualizar senha.", 500);
+    }
+
+} catch (PDOException $e) {
+    error_log("Erro ao atualizar password: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

@@ -1,35 +1,32 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin']);
 
-if (isset($data['name']) && isset($data['capacity'])) {
+$data = get_json_body();
+require_fields($data, ['name', 'capacity']);
 
-    try {
-        // MUDANÇA AQUI: Usamos 'has_projector' em vez de 'description'
-        $sql = "INSERT INTO rooms (name, capacity, has_projector, is_active) 
-                VALUES (:name, :capacity, :has_projector, 1)";
+$name = htmlspecialchars(strip_tags($data['name']));
+$capacity = validate_positive_int($data['capacity'], 'capacity');
+$hasProjector = isset($data['has_projector']) && $data['has_projector'] ? 1 : 0;
 
-        $stmt = $conn->prepare($sql);
+try {
+    $sql = "INSERT INTO rooms (name, capacity, has_projector, is_active) VALUES (:name, :capacity, :has_projector, 1)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':name', $name);
+    $stmt->bindParam(':capacity', $capacity, PDO::PARAM_INT);
+    $stmt->bindParam(':has_projector', $hasProjector, PDO::PARAM_INT);
 
-        $name = htmlspecialchars(strip_tags($data['name']));
-
-        // Converte o true/false do Javascript para 1 ou 0 do MySQL
-        $hasProjector = isset($data['has_projector']) && $data['has_projector'] ? 1 : 0;
-
-        $stmt->bindParam(':name', $name);
-        $stmt->bindParam(':capacity', $data['capacity']);
-        $stmt->bindParam(':has_projector', $hasProjector); // Bind do projetor
-
-        if ($stmt->execute()) {
-            echo json_encode(["status" => "sucesso", "mensagem" => "Sala criada com sucesso!"]);
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Não foi possível criar a sala."]);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+    if ($stmt->execute()) {
+        json_success("Sala criada com sucesso!", [], 201);
+    } else {
+        json_error("Não foi possível criar a sala.", 500);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "Nome e Capacidade são obrigatórios."]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao criar sala: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

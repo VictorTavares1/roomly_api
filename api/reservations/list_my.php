@@ -1,32 +1,29 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-// Prevenção de erro: verifica se a variável se chama $conn ou $pdo no db.php
-$db = isset($conn) ? $conn : $pdo;
+$auth_user = authenticate($conn);
 
-// Receber o ID do utilizador pela URL
-if (isset($_GET['user_id'])) {
-    $user_id = $_GET['user_id'];
+// Usa o ID do utilizador autenticado (ignora o query param por segurança)
+$user_id = $auth_user['id'];
 
-    // SQL PODEROSO (ATUALIZADO): 
-    // 1. Vai à tabela reservations (r)
-    // 2. Junta com a tabela rooms (rm) para sabermos o nome da sala
-    // 3. Filtra pelo user E pelo tempo (end_time >= NOW())
+try {
     $sql = "SELECT r.*, rm.name as room_name 
             FROM reservations r
             JOIN rooms rm ON r.rooms_id = rm.id
             WHERE r.users_id = :uid
-            AND r.end_time >= NOW()   -- <-- O TRUQUE ESTÁ AQUI: Esconde o passado!
-            ORDER BY r.start_time ASC"; // Mudei para ASC (do mais cedo para o mais tarde)
+            AND r.end_time >= NOW()
+            ORDER BY r.start_time ASC";
 
-    $stmt = $db->prepare($sql);
-    $stmt->bindParam(':uid', $user_id);
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':uid', $user_id, PDO::PARAM_INT);
     $stmt->execute();
 
     $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     echo json_encode($reservations);
-} else {
-    echo json_encode([]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao listar minhas reservas: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

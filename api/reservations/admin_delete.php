@@ -1,25 +1,30 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin']);
 
-if (isset($data['id'])) {
-    try {
-        // DELETE direto para libertar o horário imediatamente
-        $sql = "DELETE FROM reservations WHERE id = :id";
+$data = get_json_body();
+require_fields($data, ['id']);
 
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':id', $data['id']);
+$id = validate_positive_int($data['id'], 'id');
 
-        if ($stmt->execute()) {
-            echo json_encode(["status" => "sucesso", "mensagem" => "Reserva cancelada!"]);
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Erro ao cancelar."]);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+try {
+    $sql = "DELETE FROM reservations WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+    if ($stmt->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        logActivity($conn, $auth_user['id'], 'admin_delete', "Admin eliminou reserva ID $id");
+        json_success("Reserva eliminada pelo administrador.");
+    } else {
+        json_error("Erro ao eliminar reserva.", 500);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "ID em falta."]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao eliminar reserva (admin): " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

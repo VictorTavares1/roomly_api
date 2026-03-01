@@ -16,7 +16,7 @@ Este projeto foi desenvolvido com uma arquitetura separada (Headless), garantind
 *   **Linguagem:** PHP 8+ (Vanilla)
 *   **Base de Dados:** MySQL / MariaDB
 *   **Servidor Web:** Apache (via XAMPP)
-*   **Segurança:** PDO (Prepared Statements), Password Hashing (Bcrypt), CORS Centralizado.
+*   **Segurança:** PDO (Prepared Statements), Passwords: Hashing (Bcrypt), CORS Centralizado.
 *   **Arquitetura:** RESTful API organizada por recursos.
 
 ### Frontend (Interface)
@@ -87,7 +87,7 @@ Aqui estão alguns dos principais endpoints disponíveis:
 | GET    | `/api/rooms/list.php`       | Lista todas as salas ativas        |
 | GET    | `/api/reservations/list_all.php` | Lista todas as reservas       |
 | POST   | `/api/reservations/create.php`   | Cria uma nova reserva         |
-| GET    | `/api/reports/dashboard_stats.php` | Estatísticas para o Dashboard |
+| GET    | `/api/reports/dashboard_stats.php` | Estatísticas para o Dashboard|
 
 ---
 

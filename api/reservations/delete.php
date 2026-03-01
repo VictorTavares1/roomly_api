@@ -1,59 +1,49 @@
 <?php
-require '../../config/db.php';
-require '../../config/logger.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
 
-if (isset($data['id'])) {
-    $id = $data['id'];
+$data = get_json_body();
+require_fields($data, ['id']);
 
-    try {
-        // -----------------------------------------------------------
-        // PASSO 1: Buscar dados da reserva ANTES de apagar
-        // (Senão não sabemos o que escrever no log)
-        // -----------------------------------------------------------
-        $query_info = "SELECT users_id, rooms_id, start_time FROM reservations WHERE id = :id";
-        $stmt_info = $conn->prepare($query_info);
-        $stmt_info->bindParam(':id', $id);
-        $stmt_info->execute();
-        $reserva = $stmt_info->fetch(PDO::FETCH_ASSOC);
+$id = validate_positive_int($data['id'], 'id');
 
-        if ($reserva) {
-            // -------------------------------------------------------
-            // PASSO 2: Apagar a reserva
-            // -------------------------------------------------------
-            $sql = "DELETE FROM reservations WHERE id = :id";
-            $stmt = $conn->prepare($sql);
-            $stmt->bindParam(':id', $id);
+try {
+    // 1. Buscar dados da reserva antes de apagar
+    $query_info = "SELECT users_id, rooms_id, start_time FROM reservations WHERE id = :id";
+    $stmt_info = $conn->prepare($query_info);
+    $stmt_info->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt_info->execute();
+    $reserva = $stmt_info->fetch(PDO::FETCH_ASSOC);
 
-            if ($stmt->execute()) {
-
-                // ---------------------------------------------------
-                // PASSO 3: Registar no Log (Se apagou com sucesso)
-                // ---------------------------------------------------
-
-                // Formata a data para ficar legível (Ex: 2026-02-14 10:00)
-                $data_reserva = substr($reserva['start_time'], 0, 16);
-
-                $descricao = "Cancelou reserva da Sala ID " . $reserva['rooms_id'] . " (" . $data_reserva . ")";
-
-                // Usamos o ID do utilizador que estava na reserva
-                logActivity($conn, $reserva['users_id'], 'cancelamento', $descricao);
-
-                // ---------------------------------------------------
-
-                echo json_encode(["status" => "sucesso"]);
-            } else {
-                echo json_encode(["status" => "erro", "mensagem" => "Não foi possível apagar."]);
-            }
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Reserva não encontrada."]);
-        }
-
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+    if (!$reserva) {
+        json_error("Reserva não encontrada.", 404);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "ID em falta."]);
+
+    // Verificar que o utilizador é o dono da reserva (a não ser que seja admin)
+    if ($reserva['users_id'] != $auth_user['id'] && $auth_user['role'] !== 'admin') {
+        json_error("Sem permissão para cancelar esta reserva.", 403);
+    }
+
+    // 2. Apagar a reserva
+    $sql = "DELETE FROM reservations WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+    if ($stmt->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        $data_reserva = substr($reserva['start_time'], 0, 16);
+        $descricao = "Cancelou reserva da Sala ID " . $reserva['rooms_id'] . " (" . $data_reserva . ")";
+        logActivity($conn, $auth_user['id'], 'cancelamento', $descricao);
+
+        json_success("Reserva cancelada com sucesso!");
+    } else {
+        json_error("Não foi possível cancelar.", 500);
+    }
+
+} catch (PDOException $e) {
+    error_log("Erro ao apagar reserva: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

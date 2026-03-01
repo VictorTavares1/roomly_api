@@ -1,8 +1,10 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
+
+$auth_user = authenticate($conn);
 
 try {
-    // Trazemos o nome da sala para aparecer no título do evento (Ex: "Sala TIC - Prof. João")
     $query = "SELECT r.id, r.start_time, r.end_time, rm.name as room_name, u.name as user_name 
               FROM reservations r 
               JOIN rooms rm ON r.rooms_id = rm.id
@@ -17,6 +19,7 @@ try {
     echo json_encode($events);
 
 } catch (PDOException $e) {
-    echo json_encode(["error" => $e->getMessage()]);
+    error_log("Erro ao buscar eventos do calendário: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

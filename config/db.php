@@ -13,9 +13,10 @@ try {
 
 } catch (PDOException $e) {
 
+    error_log("DB Connection Error: " . $e->getMessage());
     echo json_encode([
         "status" => "erro",
-        "mensagem" => "Erro fatal na BD: " . $e->getMessage()
+        "mensagem" => "Erro interno do servidor."
     ]);
     exit;
 }

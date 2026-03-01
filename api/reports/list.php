@@ -1,15 +1,23 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-// Aqui fazemos a ligação (JOIN) usando os nomes corretos da tua tabela
-$query = "SELECT r.*, u.name as user_name, rm.name as room_name 
-          FROM reports r
-          JOIN users u ON r.users_id = u.id  
-          JOIN rooms rm ON r.rooms_id = rm.id
-          ORDER BY r.id DESC"; // Ordenar pelos mais recentes
+$auth_user = authenticate($conn);
 
-$stmt = $conn->prepare($query);
-$stmt->execute();
+try {
+    $query = "SELECT r.*, u.name as user_name, rm.name as room_name 
+              FROM reports r
+              JOIN users u ON r.users_id = u.id  
+              JOIN rooms rm ON r.rooms_id = rm.id
+              ORDER BY r.id DESC";
 
-echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    $stmt = $conn->prepare($query);
+    $stmt->execute();
+
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+} catch (PDOException $e) {
+    error_log("Erro ao listar reportes: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
+}
 ?>

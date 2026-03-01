@@ -1,25 +1,35 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin']);
 
-if (isset($data['id']) && isset($data['role'])) {
-    try {
-        $sql = "UPDATE users SET role = :role WHERE id = :id";
-        $stmt = $conn->prepare($sql);
+$data = get_json_body();
+require_fields($data, ['id', 'role']);
 
-        $stmt->bindParam(':role', $data['role']);
-        $stmt->bindParam(':id', $data['id']);
+$id = validate_positive_int($data['id'], 'id');
+validate_whitelist($data['role'], ['professor', 'funcionario', 'admin'], 'role');
 
-        if ($stmt->execute()) {
-            echo json_encode(["status" => "sucesso", "mensagem" => "Cargo atualizado com sucesso!"]);
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Erro ao atualizar cargo."]);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+// Admin não pode alterar o seu próprio role
+if ($id == $auth_user['id']) {
+    json_error("Não podes alterar o teu próprio cargo.", 400);
+}
+
+try {
+    $sql = "UPDATE users SET role = :role WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':role', $data['role']);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+    if ($stmt->execute()) {
+        json_success("Cargo atualizado com sucesso!");
+    } else {
+        json_error("Erro ao atualizar cargo.", 500);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "Dados em falta."]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao atualizar role: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

@@ -1,22 +1,35 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"));
+$auth_user = authenticate($conn);
 
-// O frontend envia 'user_id' e 'room_id', mas gravamos em 'users_id' e 'rooms_id'
-if (isset($data->user_id) && isset($data->room_id) && isset($data->description)) {
-    // ATENÇÃO AQUI: users_id e rooms_id
+$data = get_json_body();
+require_fields($data, ['room_id', 'description']);
+
+// Usa o ID do utilizador autenticado
+$user_id = $auth_user['id'];
+$description = htmlspecialchars(strip_tags($data['description']));
+$room_id = validate_positive_int($data['room_id'], 'room_id');
+
+try {
     $query = "INSERT INTO reports (users_id, rooms_id, description, status) VALUES (:uid, :rid, :desc, 'aberto')";
     $stmt = $conn->prepare($query);
-
-    $stmt->bindParam(":uid", $data->user_id);
-    $stmt->bindParam(":rid", $data->room_id);
-    $stmt->bindParam(":desc", $data->description);
+    $stmt->bindParam(":uid", $user_id, PDO::PARAM_INT);
+    $stmt->bindParam(":rid", $room_id, PDO::PARAM_INT);
+    $stmt->bindParam(":desc", $description);
 
     if ($stmt->execute()) {
-        echo json_encode(["status" => "sucesso"]);
+        require_once __DIR__ . '/../../config/logger.php';
+        logActivity($conn, $user_id, 'reporte', "Reportou problema na Sala ID $room_id");
+
+        json_success("Reporte criado com sucesso!", [], 201);
     } else {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro ao guardar report."]);
+        json_error("Erro ao guardar reporte.", 500);
     }
+
+} catch (PDOException $e) {
+    error_log("Erro ao criar reporte: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

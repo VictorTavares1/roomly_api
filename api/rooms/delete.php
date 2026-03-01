@@ -1,27 +1,29 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin']);
 
-if (isset($data['id'])) {
+$data = get_json_body();
+require_fields($data, ['id']);
 
-    try {
-        // NÃO APAGAMOS! Apenas desativamos (is_active = 0)
-        // Assim não perdes o histórico das reservas dessa sala.
-        $sql = "UPDATE rooms SET is_active = 0 WHERE id = :id";
+$id = validate_positive_int($data['id'], 'id');
 
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':id', $data['id']);
+try {
+    // Soft delete (desativar, não apagar)
+    $sql = "UPDATE rooms SET is_active = 0 WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
 
-        if ($stmt->execute()) {
-            echo json_encode(["status" => "sucesso", "mensagem" => "Sala desativada com sucesso!"]);
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Erro ao desativar sala."]);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+    if ($stmt->execute()) {
+        json_success("Sala desativada com sucesso!");
+    } else {
+        json_error("Erro ao desativar sala.", 500);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "ID da sala em falta."]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao desativar sala: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>

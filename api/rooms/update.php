@@ -1,38 +1,34 @@
 <?php
-require '../../config/db.php';
+require __DIR__ . '/../../config/db.php';
+require __DIR__ . '/../../config/middleware.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$auth_user = authenticate($conn);
+require_role($auth_user, ['admin']);
 
-// Precisamos do ID para saber qual atualizar, e dos dados novos
-if (isset($data['id']) && isset($data['name']) && isset($data['capacity'])) {
+$data = get_json_body();
+require_fields($data, ['id', 'name', 'capacity']);
 
-    try {
-        $sql = "UPDATE rooms 
-                SET name = :name, 
-                    capacity = :capacity, 
-                    has_projector = :has_projector 
-                WHERE id = :id";
+$id = validate_positive_int($data['id'], 'id');
+$name = htmlspecialchars(strip_tags($data['name']));
+$capacity = validate_positive_int($data['capacity'], 'capacity');
+$hasProjector = (isset($data['has_projector']) && $data['has_projector']) ? 1 : 0;
 
-        $stmt = $conn->prepare($sql);
+try {
+    $sql = "UPDATE rooms SET name = :name, capacity = :capacity, has_projector = :has_projector WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':name', $name);
+    $stmt->bindParam(':capacity', $capacity, PDO::PARAM_INT);
+    $stmt->bindParam(':has_projector', $hasProjector, PDO::PARAM_INT);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
 
-        $name = htmlspecialchars(strip_tags($data['name']));
-        // Converte true/false para 1 ou 0
-        $hasProjector = (isset($data['has_projector']) && $data['has_projector']) ? 1 : 0;
-
-        $stmt->bindParam(':name', $name);
-        $stmt->bindParam(':capacity', $data['capacity']);
-        $stmt->bindParam(':has_projector', $hasProjector);
-        $stmt->bindParam(':id', $data['id']);
-
-        if ($stmt->execute()) {
-            echo json_encode(["status" => "sucesso", "mensagem" => "Sala atualizada!"]);
-        } else {
-            echo json_encode(["status" => "erro", "mensagem" => "Não foi possível atualizar."]);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(["status" => "erro", "mensagem" => "Erro SQL: " . $e->getMessage()]);
+    if ($stmt->execute()) {
+        json_success("Sala atualizada com sucesso!");
+    } else {
+        json_error("Não foi possível atualizar.", 500);
     }
-} else {
-    echo json_encode(["status" => "erro", "mensagem" => "Dados incompletos."]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao atualizar sala: " . $e->getMessage());
+    json_error("Erro interno do servidor.", 500);
 }
 ?>
