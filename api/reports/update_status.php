@@ -18,6 +18,8 @@ try {
     $stmt->bindParam(":id", $id, PDO::PARAM_INT);
 
     if ($stmt->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        logActivity($conn, $auth_user['id'], 'alteracao_reporte', "Reporte #{$id} → {$data['status']}");
         json_success("Estado do reporte atualizado!");
     } else {
         json_error("Erro ao atualizar estado.", 500);

@@ -24,6 +24,16 @@ try {
         json_error("Sem permissão para editar esta reserva.", 403);
     }
 
+    // Verificar se a reserva já começou
+    $stmt_time = $conn->prepare("SELECT start_time FROM reservations WHERE id = :id");
+    $stmt_time->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt_time->execute();
+    $reserva_time = $stmt_time->fetch(PDO::FETCH_ASSOC);
+
+    if (strtotime($reserva_time['start_time']) <= time()) {
+        json_error("Não é possível editar uma reserva que já começou.", 403);
+    }
+
     // Verificar conflito de horário (excluir a própria reserva)
     $checkSql = "SELECT id FROM reservations 
                  WHERE rooms_id = :room 
@@ -53,6 +63,9 @@ try {
     $update->bindParam(':id', $id, PDO::PARAM_INT);
 
     if ($update->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        $desc = "Reserva #" . $id . ($purpose ? " — " . mb_substr($purpose, 0, 40) : "");
+        logActivity($conn, $auth_user['id'], 'alteracao', $desc);
         json_success("Reserva atualizada com sucesso!");
     } else {
         json_error("Erro ao atualizar.", 500);

@@ -5,7 +5,26 @@ require __DIR__ . '/../../config/middleware.php';
 $auth_user = authenticate($conn);
 
 try {
-    $sql = "SELECT id, name, capacity, has_projector, is_active FROM rooms WHERE is_active = 1";
+    $sql = "SELECT
+                r.id,
+                r.name,
+                r.capacity,
+                r.has_projector,
+                r.is_active,
+                r.type,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM reservations res
+                        WHERE res.rooms_id = r.id
+                          AND res.status != 'cancelada'
+                          AND NOW() BETWEEN res.start_time AND res.end_time
+                    ) THEN 'em_curso'
+                    ELSE 'disponivel'
+                END AS status
+            FROM rooms r
+            WHERE r.is_active = 1
+            ORDER BY r.name ASC";
+
     $stmt = $conn->prepare($sql);
     $stmt->execute();
     $rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);

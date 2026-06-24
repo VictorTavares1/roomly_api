@@ -39,6 +39,8 @@ try {
     $stmt->bindParam(':role', $role);
 
     if ($stmt->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        logActivity($conn, $auth_user['id'], 'novo_utilizador', "Utilizador \"{$name}\" criado ({$role})");
         json_success("Utilizador criado com sucesso!", [], 201);
     } else {
         json_error("Erro ao criar utilizador.", 500);

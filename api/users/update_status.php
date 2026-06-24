@@ -17,6 +17,11 @@ if ($id == $auth_user['id'] && $is_active == 0) {
 }
 
 try {
+    $stmt_uname = $conn->prepare("SELECT name FROM users WHERE id = :id");
+    $stmt_uname->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt_uname->execute();
+    $target_user = $stmt_uname->fetch(PDO::FETCH_ASSOC);
+
     $sql = "UPDATE users SET is_active = :status WHERE id = :id";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':status', $is_active, PDO::PARAM_INT);
@@ -29,6 +34,11 @@ try {
             $stmt_token->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt_token->execute();
         }
+
+        require_once __DIR__ . '/../../config/logger.php';
+        $uname = $target_user['name'] ?? "ID {$id}";
+        $action_desc = $is_active == 1 ? "Conta de \"{$uname}\" reativada" : "Conta de \"{$uname}\" desativada";
+        logActivity($conn, $auth_user['id'], 'alteracao_status', $action_desc);
 
         $msg = $is_active == 1 ? "Conta reativada!" : "Conta desativada!";
         json_success($msg);

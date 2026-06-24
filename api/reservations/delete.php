@@ -26,15 +26,24 @@ try {
         json_error("Sem permissão para cancelar esta reserva.", 403);
     }
 
-    // 2. Apagar a reserva
-    $sql = "DELETE FROM reservations WHERE id = :id";
+    // Não permitir cancelar reservas já terminadas
+    if (strtotime($reserva['start_time']) < time()) {
+        json_error("Não é possível cancelar uma reserva que já decorreu ou está em curso.", 400);
+    }
+
+    // 2. Marcar como cancelada (não apagar — preserva histórico)
+    $sql = "UPDATE reservations SET status = 'cancelada' WHERE id = :id";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
 
     if ($stmt->execute()) {
         require_once __DIR__ . '/../../config/logger.php';
-        $data_reserva = substr($reserva['start_time'], 0, 16);
-        $descricao = "Cancelou reserva da Sala ID " . $reserva['rooms_id'] . " (" . $data_reserva . ")";
+        $stmt_room = $conn->prepare("SELECT name FROM rooms WHERE id = :rid");
+        $stmt_room->bindParam(':rid', $reserva['rooms_id'], PDO::PARAM_INT);
+        $stmt_room->execute();
+        $room_name = $stmt_room->fetchColumn() ?: "Sala #" . $reserva['rooms_id'];
+        $hora = substr($reserva['start_time'], 11, 5);
+        $descricao = "\"$room_name\" — reserva das $hora cancelada";
         logActivity($conn, $auth_user['id'], 'cancelamento', $descricao);
 
         json_success("Reserva cancelada com sucesso!");

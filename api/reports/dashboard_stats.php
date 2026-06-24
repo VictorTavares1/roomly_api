@@ -8,24 +8,19 @@ $auth_user = authenticate($conn);
 $user_id = $auth_user['id'];
 
 try {
-    // 1. Salas disponíveis hoje (query otimizada sem DATE())
-    $query_rooms = "SELECT COUNT(r.id) as total 
-                    FROM rooms r
-                    LEFT JOIN reservations res ON r.id = res.rooms_id 
-                      AND res.start_time >= CURDATE() 
-                      AND res.start_time < CURDATE() + INTERVAL 1 DAY
-                      AND res.status != 'cancelled' 
-                    WHERE r.is_active = 1 AND res.id IS NULL";
+    // 1. Salas disponíveis (ativas e não em manutenção)
+    $query_rooms = "SELECT COUNT(id) as total FROM rooms WHERE is_active = 1";
 
     $stmt_rooms = $conn->prepare($query_rooms);
     $stmt_rooms->execute();
     $rooms = $stmt_rooms->fetch(PDO::FETCH_ASSOC)['total'];
 
-    // 2. Minhas reservas hoje
-    $query_res = "SELECT COUNT(*) as total FROM reservations 
-                  WHERE users_id = :uid 
-                  AND start_time >= CURDATE() 
-                  AND start_time < CURDATE() + INTERVAL 1 DAY";
+    // 2. Minhas reservas hoje (apenas futuras/em curso)
+    $query_res = "SELECT COUNT(*) as total FROM reservations
+                  WHERE users_id = :uid
+                  AND start_time >= CURDATE()
+                  AND start_time < CURDATE() + INTERVAL 1 DAY
+                  AND end_time >= NOW()";
     $stmt_res = $conn->prepare($query_res);
     $stmt_res->bindParam(":uid", $user_id, PDO::PARAM_INT);
     $stmt_res->execute();
@@ -43,6 +38,12 @@ try {
     $stmt_users = $conn->prepare($query_users);
     $stmt_users->execute();
     $users = $stmt_users->fetch(PDO::FETCH_ASSOC)['total'];
+
+    // 4b. Problemas reportados (não resolvidos)
+    $query_reports = "SELECT COUNT(*) as total FROM reports WHERE status IN ('aberto', 'em_progresso')";
+    $stmt_reports = $conn->prepare($query_reports);
+    $stmt_reports->execute();
+    $reported_problems = $stmt_reports->fetch(PDO::FETCH_ASSOC)['total'];
 
     // 5. Atividades recentes (admin vê tudo, user vê só as suas)
     $activities = [];
@@ -64,13 +65,30 @@ try {
         $stmt_logs->execute();
     }
 
+    $action_labels = [
+        'reserva'           => 'Reserva confirmada',
+        'cancelamento'      => 'Reserva cancelada',
+        'alteracao'         => 'Reserva alterada',
+        'reporte'           => 'Problema reportado',
+        'alteracao_reporte' => 'Reporte atualizado',
+        'admin_delete'      => 'Reserva eliminada (admin)',
+        'nova_sala'         => 'Sala criada',
+        'alteracao_sala'    => 'Sala atualizada',
+        'remocao_sala'      => 'Sala desativada',
+        'novo_utilizador'   => 'Utilizador criado',
+        'alteracao_status'  => 'Estado de conta alterado',
+        'alteracao_cargo'   => 'Cargo atualizado',
+    ];
+
     while ($row = $stmt_logs->fetch(PDO::FETCH_ASSOC)) {
+        $type = strtolower($row['action_type']);
         $activities[] = [
-            'user' => $row['user_name'] ?? 'Desconhecido',
-            'action' => $row['action_type'],
-            'target' => $row['description'],
-            'time' => $row['created_at'],
-            'type' => strtolower($row['action_type'])
+            'user'         => $row['user_name'] ?? 'Desconhecido',
+            'action'       => $row['action_type'],
+            'action_label' => $action_labels[$type] ?? $row['action_type'],
+            'target'       => $row['description'],
+            'time'         => $row['created_at'],
+            'type'         => $type,
         ];
     }
 
@@ -90,6 +108,7 @@ try {
         "reservations_today" => $reservations_today,
         "total_reservations" => $total_reservations,
         "users" => $users,
+        "reported_problems" => $reported_problems,
         "recent_activities" => $activities,
         "chart_data" => $chart_data
     ]);

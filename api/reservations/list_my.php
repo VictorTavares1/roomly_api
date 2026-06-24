@@ -8,12 +8,12 @@ $auth_user = authenticate($conn);
 $user_id = $auth_user['id'];
 
 try {
-    $sql = "SELECT r.*, rm.name as room_name 
+    $sql = "SELECT r.*, rm.name as room_name,
+                   CASE WHEN r.end_time < NOW() THEN 1 ELSE 0 END AS is_past
             FROM reservations r
             JOIN rooms rm ON r.rooms_id = rm.id
             WHERE r.users_id = :uid
-            AND r.end_time >= NOW()
-            ORDER BY r.start_time ASC";
+            ORDER BY r.start_time DESC";
 
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':uid', $user_id, PDO::PARAM_INT);

@@ -17,12 +17,20 @@ if ($id == $auth_user['id']) {
 }
 
 try {
+    $stmt_uname = $conn->prepare("SELECT name FROM users WHERE id = :id");
+    $stmt_uname->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt_uname->execute();
+    $target_user = $stmt_uname->fetch(PDO::FETCH_ASSOC);
+
     $sql = "UPDATE users SET role = :role WHERE id = :id";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':role', $data['role']);
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
 
     if ($stmt->execute()) {
+        require_once __DIR__ . '/../../config/logger.php';
+        $uname = $target_user['name'] ?? "ID {$id}";
+        logActivity($conn, $auth_user['id'], 'alteracao_cargo', "Cargo de \"{$uname}\" → {$data['role']}");
         json_success("Cargo atualizado com sucesso!");
     } else {
         json_error("Erro ao atualizar cargo.", 500);

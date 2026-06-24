@@ -1,0 +1,9 @@
+# Segredos — nunca commitar
+.env
+
+# Uploads de utilizadores
+uploads/
+
+# Logs
+*.log
+error_log
