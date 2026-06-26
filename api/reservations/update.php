@@ -24,20 +24,28 @@ try {
         json_error("Sem permissão para editar esta reserva.", 403);
     }
 
-    // Verificar se a reserva já começou
+    // Verificar se faltam menos de 15 minutos para o início (admin é isento)
     $stmt_time = $conn->prepare("SELECT start_time FROM reservations WHERE id = :id");
     $stmt_time->bindParam(':id', $id, PDO::PARAM_INT);
     $stmt_time->execute();
     $reserva_time = $stmt_time->fetch(PDO::FETCH_ASSOC);
 
-    if (strtotime($reserva_time['start_time']) <= time()) {
-        json_error("Não é possível editar uma reserva que já começou.", 403);
+    $minutos_restantes = (strtotime($reserva_time['start_time']) - time()) / 60;
+    if ($auth_user['role'] !== 'admin' && $minutos_restantes < 15) {
+        json_error("Não é possível editar uma reserva com menos de 15 minutos de antecedência.", 403);
     }
 
-    // Verificar conflito de horário (excluir a própria reserva)
-    $checkSql = "SELECT id FROM reservations 
-                 WHERE rooms_id = :room 
-                 AND id != :id  
+    // Duração mínima de 15 minutos
+    $duracao_min = (strtotime($data['end_time']) - strtotime($data['start_time'])) / 60;
+    if ($duracao_min < 15) {
+        json_error("A reserva deve ter pelo menos 15 minutos de duração.", 400);
+    }
+
+    // Verificar conflito de horário (excluir a própria reserva e canceladas)
+    $checkSql = "SELECT id FROM reservations
+                 WHERE rooms_id = :room
+                 AND id != :id
+                 AND status != 'cancelada'
                  AND (start_time < :end AND end_time > :start)";
 
     $stmt = $conn->prepare($checkSql);
@@ -52,9 +60,12 @@ try {
     }
 
     // Atualizar
-    $purpose = htmlspecialchars(strip_tags($data['purpose'] ?? ''));
+    $purpose = trim(htmlspecialchars(strip_tags($data['purpose'] ?? '')));
+    if (strlen($purpose) < 3) json_error("O motivo deve ter pelo menos 3 caracteres.", 400);
+    if (strlen($purpose) > 200) json_error("O motivo não pode exceder 200 caracteres.", 400);
 
-    $sql = "UPDATE reservations SET rooms_id = :room, start_time = :start, end_time = :end, purpose = :purpose WHERE id = :id";
+    // Ao editar, volta a pendente — o utilizador terá de fazer check-in de novo
+    $sql = "UPDATE reservations SET rooms_id = :room, start_time = :start, end_time = :end, purpose = :purpose, status = 'pendente', confirmed_at = NULL WHERE id = :id";
     $update = $conn->prepare($sql);
     $update->bindParam(':room', $data['rooms_id'], PDO::PARAM_INT);
     $update->bindParam(':start', $data['start_time']);

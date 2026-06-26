@@ -8,16 +8,40 @@ require_role($auth_user, ['admin']);
 $data = get_json_body();
 require_fields($data, ['name', 'email', 'password']);
 
-$name = htmlspecialchars(strip_tags($data['name']));
-$email = filter_var($data['email'], FILTER_VALIDATE_EMAIL);
+$name = trim(htmlspecialchars(strip_tags($data['name'])));
+$email = filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL);
+$password = $data['password'];
+$role = isset($data['role']) ? $data['role'] : 'professor';
 
+// Validar nome
+if (strlen($name) < 3) {
+    json_error("O nome deve ter pelo menos 3 caracteres.", 400);
+}
+if (strlen($name) > 100) {
+    json_error("O nome não pode ultrapassar 100 caracteres.", 400);
+}
+
+// Validar email
 if (!$email) {
     json_error("Formato de email inválido.", 400);
 }
 
-$password_hash = password_hash($data['password'], PASSWORD_DEFAULT);
+// Validar password
+if (strlen($password) < 6) {
+    json_error("A palavra-passe deve ter pelo menos 6 caracteres.", 400);
+}
+if (strlen($password) > 72) {
+    json_error("A palavra-passe não pode ultrapassar 72 caracteres.", 400);
+}
+if (!preg_match('/[A-Za-z]/', $password)) {
+    json_error("A palavra-passe deve conter pelo menos uma letra.", 400);
+}
+if (!preg_match('/[0-9]/', $password)) {
+    json_error("A palavra-passe deve conter pelo menos um número.", 400);
+}
 
-$role = isset($data['role']) ? $data['role'] : 'professor';
+$password_hash = password_hash($password, PASSWORD_DEFAULT);
+
 validate_whitelist($role, ['professor', 'funcionario', 'admin'], 'role');
 
 try {

@@ -9,7 +9,7 @@ $data = get_json_body();
 require_fields($data, ['id', 'status']);
 
 $id = validate_positive_int($data['id'], 'id');
-validate_whitelist($data['status'], ['aberto', 'em_progresso', 'resolvido'], 'status');
+validate_whitelist($data['status'], ['pendente', 'resolvido'], 'status');
 
 try {
     $query = "UPDATE reports SET status = :status WHERE id = :id";

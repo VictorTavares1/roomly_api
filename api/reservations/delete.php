@@ -26,9 +26,10 @@ try {
         json_error("Sem permissão para cancelar esta reserva.", 403);
     }
 
-    // Não permitir cancelar reservas já terminadas
-    if (strtotime($reserva['start_time']) < time()) {
-        json_error("Não é possível cancelar uma reserva que já decorreu ou está em curso.", 400);
+    // Não permitir cancelar com menos de 15 minutos de antecedência (admin é isento)
+    $minutos_restantes = (strtotime($reserva['start_time']) - time()) / 60;
+    if ($auth_user['role'] !== 'admin' && $minutos_restantes < 15) {
+        json_error("Não é possível cancelar uma reserva com menos de 15 minutos de antecedência.", 400);
     }
 
     // 2. Marcar como cancelada (não apagar — preserva histórico)

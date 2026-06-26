@@ -9,7 +9,9 @@ $data = get_json_body();
 require_fields($data, ['id', 'name', 'capacity']);
 
 $id = validate_positive_int($data['id'], 'id');
-$name = htmlspecialchars(strip_tags($data['name']));
+$name = trim(htmlspecialchars(strip_tags($data['name'])));
+if (strlen($name) < 2) json_error("O nome da sala deve ter pelo menos 2 caracteres.", 400);
+if (strlen($name) > 100) json_error("O nome da sala não pode exceder 100 caracteres.", 400);
 $capacity = validate_positive_int($data['capacity'], 'capacity');
 $hasProjector = (isset($data['has_projector']) && $data['has_projector']) ? 1 : 0;
 

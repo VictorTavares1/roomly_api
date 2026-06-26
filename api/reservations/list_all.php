@@ -4,6 +4,9 @@ require __DIR__ . '/../../config/middleware.php';
 
 $auth_user = authenticate($conn);
 
+// Expira automaticamente reservas pendentes sem check-in
+require __DIR__ . '/expire_pending.php';
+
 try {
     $sql = "SELECT r.id, r.start_time, r.end_time, r.purpose, r.status,
                    u.name as user_name, rm.name as room_name

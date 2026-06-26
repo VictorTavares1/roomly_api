@@ -6,11 +6,13 @@ $auth_user = authenticate($conn);
 
 $user_id     = $auth_user['id'];
 $room_id     = isset($_POST['room_id']) ? validate_positive_int($_POST['room_id'], 'room_id') : null;
-$description = isset($_POST['description']) ? htmlspecialchars(strip_tags($_POST['description'])) : '';
+$description = isset($_POST['description']) ? trim(htmlspecialchars(strip_tags($_POST['description']))) : '';
 
 if (!$room_id || !$description) {
     json_error("Campos obrigatórios em falta: room_id, description.", 400);
 }
+if (strlen($description) < 10) json_error("A descrição deve ter pelo menos 10 caracteres.", 400);
+if (strlen($description) > 1000) json_error("A descrição não pode exceder 1000 caracteres.", 400);
 
 $image_path = null;
 
@@ -46,7 +48,7 @@ if (!empty($_FILES['image']['name'])) {
 }
 
 try {
-    $query = "INSERT INTO reports (users_id, rooms_id, description, image_path, status) VALUES (:uid, :rid, :desc, :img, 'aberto')";
+    $query = "INSERT INTO reports (users_id, rooms_id, description, image_path, status) VALUES (:uid, :rid, :desc, :img, 'pendente')";
     $stmt  = $conn->prepare($query);
     $stmt->bindParam(':uid',  $user_id,    PDO::PARAM_INT);
     $stmt->bindParam(':rid',  $room_id,    PDO::PARAM_INT);

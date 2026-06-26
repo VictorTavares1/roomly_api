@@ -19,9 +19,10 @@ try {
         json_error("Não é possível criar uma reserva para uma data/hora que já passou.", 400);
     }
 
-    // 2. Verificar se a sala já está ocupada neste horário
-    $checkSql = "SELECT id FROM reservations 
-                 WHERE rooms_id = :room 
+    // 2. Verificar se a sala já está ocupada neste horário (ignora canceladas)
+    $checkSql = "SELECT id FROM reservations
+                 WHERE rooms_id = :room
+                 AND status != 'cancelada'
                  AND (start_time < :end AND end_time > :start)";
 
     $stmt = $conn->prepare($checkSql);
@@ -34,7 +35,13 @@ try {
         json_error("Sala ocupada neste horário!", 409);
     }
 
-    // 2. Criar a Reserva
+    // Duração mínima de 15 minutos
+    $duracao_min = (strtotime($data['end_time']) - strtotime($data['start_time'])) / 60;
+    if ($duracao_min < 15) {
+        json_error("A reserva deve ter pelo menos 15 minutos de duração.", 400);
+    }
+
+    // 3. Criar a Reserva
     $purpose = trim(htmlspecialchars(strip_tags($data['purpose'])));
     if (strlen($purpose) < 3) {
         json_error("O motivo deve ter pelo menos 3 caracteres.", 400);
@@ -43,8 +50,8 @@ try {
         json_error("O motivo não pode exceder 200 caracteres.", 400);
     }
 
-    $sql = "INSERT INTO reservations (users_id, rooms_id, start_time, end_time, purpose, status) 
-            VALUES (:user, :room, :start, :end, :purpose, 'confirmada')";
+    $sql = "INSERT INTO reservations (users_id, rooms_id, start_time, end_time, purpose, status)
+            VALUES (:user, :room, :start, :end, :purpose, 'pendente')";
 
     $insert = $conn->prepare($sql);
     $insert->bindParam(':user', $user_id, PDO::PARAM_INT);
@@ -61,7 +68,7 @@ try {
         $stmt_room->execute();
         $room_name = $stmt_room->fetchColumn() ?: "Sala #" . $data['rooms_id'];
         $desc = "\"$room_name\" — " . substr($data['start_time'], 11, 5) . " às " . substr($data['end_time'], 11, 5);
-        logActivity($conn, $user_id, 'reserva', $desc);
+        logActivity($conn, $user_id, 'reserva_pendente', $desc);
 
         json_success("Reserva criada com sucesso!", [], 201);
     } else {
