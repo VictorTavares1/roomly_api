@@ -3,6 +3,7 @@ require __DIR__ . '/../../config/db.php';
 require __DIR__ . '/../../config/middleware.php';
 
 $auth_user = authenticate($conn);
+require_role($auth_user, ['admin', 'funcionario']);
 
 // Expira automaticamente reservas pendentes sem check-in
 require __DIR__ . '/expire_pending.php';

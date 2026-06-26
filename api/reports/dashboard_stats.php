@@ -15,19 +15,21 @@ try {
     $stmt_rooms->execute();
     $rooms = $stmt_rooms->fetch(PDO::FETCH_ASSOC)['total'];
 
-    // 2. Reservas confirmadas hoje
+    // 2. Reservas confirmadas hoje que ainda não terminaram
     if ($auth_user['role'] === 'admin' || $auth_user['role'] === 'funcionario') {
         $stmt_res = $conn->prepare("SELECT COUNT(*) as total FROM reservations
                                     WHERE start_time >= CURDATE()
                                     AND start_time < CURDATE() + INTERVAL 1 DAY
-                                    AND status = 'confirmada'");
+                                    AND status = 'confirmada'
+                                    AND end_time >= NOW()");
         $stmt_res->execute();
     } else {
         $stmt_res = $conn->prepare("SELECT COUNT(*) as total FROM reservations
                                     WHERE users_id = :uid
                                     AND start_time >= CURDATE()
                                     AND start_time < CURDATE() + INTERVAL 1 DAY
-                                    AND status = 'confirmada'");
+                                    AND status = 'confirmada'
+                                    AND end_time >= NOW()");
         $stmt_res->bindParam(":uid", $user_id, PDO::PARAM_INT);
         $stmt_res->execute();
     }
